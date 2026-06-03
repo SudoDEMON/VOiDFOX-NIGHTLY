@@ -60,7 +60,7 @@ If you want to use a different icon, place it as `icon.svg` or override `ICON_SO
 
 This started life as a single personal script `~/voidfoxbuild`. It was moved into `~/Projects/VoidFOX/`, renamed internally to `build.sh` for clarity, the project icon was imported, and turned into a git repo (with the standard memory protocol scaffolding) so the recipe itself can be versioned, diffed, and maintained properly.
 
-There is an old GitHub mirror at https://github.com/SudoDEMON/VOiDFOX-NIGHTLY (created very early, before this Projects/ + memory protocol workflow existed). The current local repo is the clean canonical home for the build logic.
+The GitHub remote (origin) is https://github.com/SudoDEMON/VOiDFOX-NIGHTLY (SSH: git@github.com:SudoDEMON/VOiDFOX-NIGHTLY.git). The current local tree (clean bootstrap with proper layout, icon.svg, docs, and renamed script) is the canonical version; its history will replace the repo's early single-file "voidfoxbuild" commit (from 2026-03) on the initial push.
 
 ## Future Work
 
