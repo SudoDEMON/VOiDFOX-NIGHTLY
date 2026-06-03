@@ -64,10 +64,13 @@ There is an old GitHub mirror at https://github.com/SudoDEMON/VOiDFOX-NIGHTLY (c
 
 ## Future Work
 
-- Extract reusable parts / make more portable where sensible
-- Add a `doctor` or `--dry-run` mode
-- Document exact steps to reproduce the icon asset
+- Add `--help` and `DRY_RUN=1` (or `--dry-run`) support (highest priority — lets you validate paths, icon, deps, and generated files without a full multi-hour build)
+- Harden TOP_OBJDIR extraction and add more upfront soft checks (disk space, additional tools like gtk-update-icon-cache)
+- Write build provenance info (recipe git hash, date, key flags) into the wrapper dir after each successful run
+- Improve profile ergonomics (better docs + perhaps a helper to discover the on-disk dir name)
+- Clarify PGO behavior in comments/docs (MOZ_PGO=1 + `./mach build` triggers automated instrument+train+optimize)
+- Extract reusable parts / make more portable where sensible (without breaking the "single ./build.sh" contract)
 - Possibly publish the mozconfig / policy bits separately
-- Keep it in sync with upstream Firefox changes that affect custom builds
+- Keep it in sync with upstream Firefox changes that affect custom builds (bootstrap.py, mach environment format, etc.)
 
 Run `./build.sh` at your own risk / for your own hardware.
