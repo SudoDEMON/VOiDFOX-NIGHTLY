@@ -11,7 +11,7 @@ The heart of the project is [build.sh](build.sh) — an opinionated, self-contai
 - Nukes previous build/wrap dirs for clean slate
 - Runs Mozilla's bootstrap.py to get Firefox source
 - Syncs to latest main
-- Writes a tuned `mozconfig` (znver5 / 9950X3D specific, thin LTO, PGO enabled, Wayland GTK, stripped, no debug/tests/crashreporter/updater)
+- Writes a tuned `mozconfig` (znver5 / 9950X3D specific, thin LTO, PGO enabled, explicit GTK X11+Wayland backends, stripped, no debug/tests/crashreporter/updater)
 - Builds with `./mach build`
 - Installs a custom SVG icon
 - Fetches and policy-installs the "icy-void-oled" theme addon

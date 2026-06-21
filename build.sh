@@ -160,7 +160,9 @@ ac_add_options --disable-debug
 ac_add_options --disable-tests
 ac_add_options --disable-crashreporter
 ac_add_options --disable-updater
-ac_add_options --enable-default-toolkit=cairo-gtk3-wayland
+# Build both GTK backends explicitly: Wayland for the primary KDE session,
+# X11 for compatibility paths used by GTK/desktop integration.
+ac_add_options --enable-default-toolkit=cairo-gtk3-x11-wayland
 ac_add_options --enable-strip
 
 mk_add_options MOZ_DEBUG_SYMBOLS=0
@@ -267,7 +269,6 @@ cat > "$WRAP_DIR/run.sh" << EOF
 set -euo pipefail
 
 export MOZ_ENABLE_WAYLAND=1
-export MOZ_DBUS_REMOTE=1
 
 # Must match ${DESKTOP_ID}.desktop and StartupWMClass for KDE grouping.
 export MOZ_APP_REMOTINGNAME="${DESKTOP_ID}"
