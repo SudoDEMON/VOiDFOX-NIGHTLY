@@ -6,11 +6,6 @@ set -euo pipefail
 # Firefox from source, custom launcher, KDE/XDG defaults fixed
 # ============================================================
 
-toilet -f wideterm -F border -F metal "FIREFOX - VOiD NIGHTLY EDITION"
-toilet -f wideterm -F border -F metal "SACRIFICING 9950X3D TO THE VOiD"
-
-toilet -f wideterm -F border -F metal "PHASE 1: SETTINGS VARIABLES"
-
 # Resolve directory of this script (so relative assets like icon.svg work
 # even if the script is run from a different cwd).
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,11 +28,235 @@ PROFILE_DIR="${PROFILE_DIR:-$HOME/.config/mozilla/firefox/drjzrsph.VOID}"
 ROOT="$HOME"
 BUILD_DIR="$ROOT/voidfox-build"
 WRAP_DIR="$ROOT/voidfox"
+AI_TEMP_DIR="${AI_TEMP_DIR:-$HOME/Projects/AI-TEMP}"
 
 NUKE_TARGETS=(
   "$BUILD_DIR"
   "$WRAP_DIR"
 )
+
+RISKY_GRAPHICS_PREFS=(
+  "layers.acceleration.force-enabled"
+  "media.hardware-video-decoding.force-enabled"
+  "media.hardware-video-encoding.force-enabled"
+  "media.navigator.mediadatadecoder_vp8_hardware_enabled"
+)
+
+WATCH_GRAPHICS_PREFS=(
+  "${RISKY_GRAPHICS_PREFS[@]}"
+  "gfx.webrender.all"
+  "widget.dmabuf.force-enabled"
+)
+
+usage() {
+  cat << EOF
+Usage:
+  ./build.sh             Build and install VOiDFOX. This removes:
+                         ${BUILD_DIR}
+                         ${WRAP_DIR}
+  ./build.sh --doctor    Run non-destructive checks for the current build/profile.
+  ./build.sh --reset-risky-prefs
+                         Back up prefs.js and remove known risky graphics/video
+                         force-enable prefs. Refuses to run while VOiDFOX is open.
+  ./build.sh --help      Show this help.
+
+Useful runtime tests after a build:
+  ${WRAP_DIR}/run.sh
+  MOZ_ENABLE_WAYLAND=0 ${WRAP_DIR}/run.sh
+  ${WRAP_DIR}/run-x11.sh
+  ${WRAP_DIR}/run-safe-mode.sh
+  VOIDFOX_LOG_GFX=1 ${WRAP_DIR}/run.sh
+
+Environment overrides:
+  PROFILE_DIR=...        Firefox profile to launch.
+  ICON_SOURCE=...        Icon to install.
+  AI_TEMP_DIR=...        Log/scratch directory for runtime diagnostics.
+EOF
+}
+
+profile_lock_pid() {
+  local lock_target=""
+  local pid=""
+
+  [[ -L "${PROFILE_DIR}/lock" ]] || return 1
+  lock_target="$(readlink "${PROFILE_DIR}/lock" || true)"
+  pid="${lock_target##*+}"
+
+  [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+
+  echo "$pid"
+}
+
+run_doctor() {
+  local issues=0
+  local gfx_warnings=0
+  local prefs_file="${PROFILE_DIR}/prefs.js"
+  local dist_firefox=""
+
+  echo "VOiDFOX doctor"
+  echo "Repo: ${SCRIPT_DIR}"
+  echo "Build dir: ${BUILD_DIR}"
+  echo "Wrapper dir: ${WRAP_DIR}"
+  echo "Profile: ${PROFILE_DIR}"
+  echo
+
+  for cmd in curl python3 git clang ld.lld jq toilet xdg-mime xdg-settings; do
+    if ! command -v "$cmd" >/dev/null; then
+      echo "WARN: Missing build/runtime command: $cmd"
+      issues=$((issues + 1))
+    fi
+  done
+
+  if [[ ! -f "$ICON_SOURCE" ]]; then
+    echo "WARN: Icon not found: $ICON_SOURCE"
+    issues=$((issues + 1))
+  fi
+
+  if [[ ! -d "$AI_TEMP_DIR" ]]; then
+    echo "WARN: AI_TEMP_DIR does not exist: $AI_TEMP_DIR"
+    issues=$((issues + 1))
+  fi
+
+  if [[ ! -d "$PROFILE_DIR" ]]; then
+    echo "WARN: Profile not found: $PROFILE_DIR"
+    issues=$((issues + 1))
+  elif [[ -f "$prefs_file" ]]; then
+    echo "Profile graphics prefs:"
+    local pref
+    local pref_lines
+    local risky_pref
+    for pref in "${WATCH_GRAPHICS_PREFS[@]}"; do
+      pref_lines="$(grep -F "user_pref(\"${pref}\"" "$prefs_file" || true)"
+      if [[ -n "$pref_lines" ]]; then
+        echo "$pref_lines"
+        for risky_pref in "${RISKY_GRAPHICS_PREFS[@]}"; do
+          if [[ "$pref" == "$risky_pref" ]]; then
+            issues=$((issues + 1))
+            gfx_warnings=$((gfx_warnings + 1))
+          fi
+        done
+      fi
+    done
+    echo
+    if (( gfx_warnings > 0 )); then
+      echo "WARN: Forced graphics/video prefs can bypass Firefox's driver blocklist decisions."
+      echo "      For stale surfaces on NVIDIA/Wayland, first test safe mode or reset these prefs."
+    fi
+  else
+    echo "WARN: prefs.js not found in profile: $prefs_file"
+    issues=$((issues + 1))
+  fi
+
+  dist_firefox="$(
+    find "$BUILD_DIR/firefox" -maxdepth 4 -type f -path '*/dist/bin/firefox' -perm -111 -print -quit 2>/dev/null || true
+  )"
+
+  if [[ -n "$dist_firefox" ]]; then
+    echo
+    echo "Built Firefox:"
+    "$dist_firefox" --version || true
+  else
+    echo "WARN: Built firefox binary not found under $BUILD_DIR/firefox"
+    issues=$((issues + 1))
+  fi
+
+  if command -v nvidia-smi >/dev/null; then
+    echo
+    echo "NVIDIA:"
+    nvidia-smi --query-gpu=name,driver_version --format=csv,noheader || true
+  fi
+
+  echo
+  if (( issues == 0 )); then
+    echo "Doctor passed."
+  else
+    echo "Doctor found ${issues} warning(s)."
+  fi
+
+  return "$issues"
+}
+
+reset_risky_prefs() {
+  local prefs_file="${PROFILE_DIR}/prefs.js"
+  local lock_pid=""
+  local backup=""
+  local tmp=""
+  local pref=""
+  local removed=0
+  local grep_status=0
+
+  if [[ ! -f "$prefs_file" ]]; then
+    echo "ERROR: prefs.js not found: $prefs_file"
+    return 1
+  fi
+
+  lock_pid="$(profile_lock_pid || true)"
+  if [[ -n "$lock_pid" ]]; then
+    echo "ERROR: VOiDFOX profile is in use by PID ${lock_pid}."
+    echo "Close all VOiDFOX windows before editing prefs.js."
+    return 1
+  fi
+
+  mkdir -p "$AI_TEMP_DIR"
+  backup="${AI_TEMP_DIR}/voidfox-prefs-$(date +%Y%m%d-%H%M%S).js"
+  tmp="${AI_TEMP_DIR}/voidfox-prefs-clean-$$.js"
+
+  cp "$prefs_file" "$backup"
+
+  for pref in "${RISKY_GRAPHICS_PREFS[@]}"; do
+    if grep -Fq "user_pref(\"${pref}\"" "$backup"; then
+      echo "Removing: ${pref}"
+      removed=$((removed + 1))
+    fi
+  done
+
+  set +e
+  grep -vF \
+    -e 'user_pref("layers.acceleration.force-enabled"' \
+    -e 'user_pref("media.hardware-video-decoding.force-enabled"' \
+    -e 'user_pref("media.hardware-video-encoding.force-enabled"' \
+    -e 'user_pref("media.navigator.mediadatadecoder_vp8_hardware_enabled"' \
+    "$backup" > "$tmp"
+  grep_status=$?
+  set -e
+
+  if (( grep_status > 1 )); then
+    echo "ERROR: Failed while filtering prefs.js"
+    rm -f "$tmp"
+    return 1
+  fi
+
+  cp "$tmp" "$prefs_file"
+  rm -f "$tmp"
+
+  echo "Backup: $backup"
+  if (( removed == 0 )); then
+    echo "No risky prefs were present."
+  else
+    echo "Removed ${removed} risky pref line(s). Restart VOiDFOX and retest."
+  fi
+}
+
+case "${1:-}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  --doctor|doctor)
+    run_doctor
+    exit $?
+    ;;
+  --reset-risky-prefs|reset-risky-prefs)
+    reset_risky_prefs
+    exit $?
+    ;;
+esac
+
+toilet -f wideterm -F border -F metal "FIREFOX - VOiD NIGHTLY EDITION"
+toilet -f wideterm -F border -F metal "SACRIFICING 9950X3D TO THE VOiD"
+
+toilet -f wideterm -F border -F metal "PHASE 1: SETTINGS VARIABLES"
 
 # =========================
 # Safety checks
@@ -262,25 +481,61 @@ EOF
 toilet -f wideterm -F border -F metal "PHASE 10: CREATE RUN WRAPPER"
 
 mkdir -p "$WRAP_DIR"
-rm -f "$WRAP_DIR/run.sh"
+rm -f "$WRAP_DIR/run.sh" "$WRAP_DIR/run-x11.sh" "$WRAP_DIR/run-safe-mode.sh" "$WRAP_DIR/run-gfx-log.sh"
 
 cat > "$WRAP_DIR/run.sh" << EOF
 #!/usr/bin/env bash
 set -euo pipefail
 
-export MOZ_ENABLE_WAYLAND=1
+export MOZ_ENABLE_WAYLAND="\${MOZ_ENABLE_WAYLAND:-1}"
 
 # Must match ${DESKTOP_ID}.desktop and StartupWMClass for KDE grouping.
 export MOZ_APP_REMOTINGNAME="${DESKTOP_ID}"
 
 FFBIN="${DISTBIN}/firefox"
-PROFILE_DIR="${PROFILE_DIR}"
+PROFILE_DIR="\${PROFILE_DIR:-${PROFILE_DIR}}"
+AI_TEMP_DIR="\${AI_TEMP_DIR:-${AI_TEMP_DIR}}"
+
+if [[ "\${VOIDFOX_LOG_GFX:-0}" == "1" ]]; then
+  mkdir -p "\$AI_TEMP_DIR" 2>/dev/null || true
+  export MOZ_LOG="\${MOZ_LOG:-PlatformDecoderModule:5,GfxInfo:5,WidgetWayland:5,Widget:3}"
+  export MOZ_LOG_FILE="\${MOZ_LOG_FILE:-\$AI_TEMP_DIR/voidfox-gfx.log}"
+fi
+
+if [[ "\${VOIDFOX_SAFE_MODE:-0}" == "1" ]]; then
+  set -- --safe-mode "\$@"
+fi
 
 exec "\$FFBIN" --profile "\$PROFILE_DIR" "\$@"
 EOF
 
-chmod 0755 "$WRAP_DIR/run.sh"
+cat > "$WRAP_DIR/run-x11.sh" << EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+export MOZ_ENABLE_WAYLAND=0
+exec "${WRAP_DIR}/run.sh" "\$@"
+EOF
+
+cat > "$WRAP_DIR/run-safe-mode.sh" << EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+export VOIDFOX_SAFE_MODE=1
+exec "${WRAP_DIR}/run.sh" "\$@"
+EOF
+
+cat > "$WRAP_DIR/run-gfx-log.sh" << EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+export VOIDFOX_LOG_GFX=1
+exec "${WRAP_DIR}/run.sh" "\$@"
+EOF
+
+chmod 0755 "$WRAP_DIR/run.sh" "$WRAP_DIR/run-x11.sh" "$WRAP_DIR/run-safe-mode.sh" "$WRAP_DIR/run-gfx-log.sh"
 cat "$WRAP_DIR/run.sh"
+ls -l "$WRAP_DIR"/run*.sh
 
 # =========================
 # Create desktop entry

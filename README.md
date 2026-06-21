@@ -15,7 +15,7 @@ The heart of the project is [build.sh](build.sh) — an opinionated, self-contai
 - Builds with `./mach build`
 - Installs a custom SVG icon
 - Fetches and policy-installs the "icy-void-oled" theme addon
-- Creates a small wrapper `~/voidfox/run.sh` that forces Wayland + proper MOZ_APP_REMOTINGNAME for KDE window grouping
+- Creates a small wrapper `~/voidfox/run.sh` that defaults to Wayland + proper MOZ_APP_REMOTINGNAME for KDE window grouping, plus X11/safe-mode/graphics-log diagnostic wrappers
 - Creates a `.desktop` entry, sets it as default browser for http/https/pdf via xdg
 - Refreshes all the KDE/icon/mime caches (including kbuildsycoca*)
 
@@ -32,12 +32,47 @@ After a successful run you launch via the app menu ("VOiDFOX") or `~/voidfox/run
 
 ```bash
 cd ~/Projects/VoidFOX
+./build.sh --doctor
+./build.sh --help
+./build.sh --reset-risky-prefs
 ./build.sh
 ```
 
 The script is deliberately loud and theatrical. It will refuse to run if safety checks on paths fail.
 
 **Warning**: It does `rm -rf` of the previous build dirs every time. It also modifies your user XDG defaults and mime handlers.
+
+`./build.sh --doctor` is non-destructive. Use it first when diagnosing the current local build/profile.
+
+## Runtime Diagnostics
+
+For stale rendered surfaces on NVIDIA/KDE Wayland, start with profile/runtime tests before changing compiler flags or doing another full build. Close all VOiDFOX windows before these tests so Firefox does not remote the request into the already-running instance.
+
+```bash
+cd ~/Projects/VoidFOX
+./build.sh --doctor
+./build.sh --reset-risky-prefs
+~/voidfox/run-safe-mode.sh
+~/voidfox/run-x11.sh
+~/voidfox/run-gfx-log.sh
+```
+
+`--reset-risky-prefs` backs up `prefs.js` into `~/Projects/AI-TEMP/` and removes only the risky graphics/video force-enable lines listed below. It refuses to run while VOiDFOX is open.
+
+`run-safe-mode.sh` starts Firefox safe mode with the normal VOiDFOX profile. If the issue disappears there, suspect profile prefs, extensions, theme, or forced graphics settings.
+
+`run-x11.sh` starts the same build/profile with `MOZ_ENABLE_WAYLAND=0`. If the issue disappears there but not in safe mode, suspect the NVIDIA/KDE Wayland path.
+
+`run-gfx-log.sh` writes graphics-related logs to `~/Projects/AI-TEMP/voidfox-gfx.log` by default. Override with `AI_TEMP_DIR=...` or `MOZ_LOG_FILE=...` if needed.
+
+The profile should not force graphics/video acceleration prefs unless there is a specific reason. In particular, reset these before treating the build as broken:
+
+```text
+layers.acceleration.force-enabled
+media.hardware-video-decoding.force-enabled
+media.hardware-video-encoding.force-enabled
+media.navigator.mediadatadecoder_vp8_hardware_enabled
+```
 
 ## Configuration Notes (Hard-coded in script)
 
@@ -47,6 +82,7 @@ The script is deliberately loud and theatrical. It will refuse to run if safety 
 - Installed icon name: `voidfox`
 - Build dir: `~/voidfox-build`
 - Wrapper/install dir: `~/voidfox`
+- Runtime diagnostics/log scratch dir: `~/Projects/AI-TEMP` (can override with `AI_TEMP_DIR=...`)
 - CPU opts: znver5 (Zen 5 / 9950X3D), -O3 etc.
 - Many Firefox features intentionally disabled for a lean build
 
@@ -64,7 +100,7 @@ The GitHub remote (origin) is https://github.com/SudoDEMON/VOiDFOX-NIGHTLY (SSH:
 
 ## Future Work
 
-- Add `--help` and `DRY_RUN=1` (or `--dry-run`) support (highest priority — lets you validate paths, icon, deps, and generated files without a full multi-hour build)
+- Add `DRY_RUN=1` (or `--dry-run`) support so generated files and path decisions can be validated without a full multi-hour build
 - Harden TOP_OBJDIR extraction and add more upfront soft checks (disk space, additional tools like gtk-update-icon-cache)
 - Write build provenance info (recipe git hash, date, key flags) into the wrapper dir after each successful run
 - Improve profile ergonomics (better docs + perhaps a helper to discover the on-disk dir name)
