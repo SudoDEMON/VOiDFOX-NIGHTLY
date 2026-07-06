@@ -1,25 +1,15 @@
-# AI coding assistant local memory (personal working files)
-#
-# project-memory.md = high-signal AI context file (primary file future Grok/Claude/Cursor/etc. should read)
-# project-journal.md = optional human narrative / story file (the enjoyable "what happened" record)
-#
-# These are personal journals for whoever is actively using the tools here.
-# They add noise to the repo and can trigger negative reactions from people
-# who dislike visible AI tooling. Anyone using similar tools will have their own anyway.
-#
-# Only remove this ignore (or force-add the files) if your team *explicitly*
-# wants to share the session history as part of the project.
-
+# Local-only project context.
 project-memory.md
 project-journal.md
+AGENTS.md
+AGENT.md
+CLAUDE.md
+GEMINI.md
+MEMORY.md
 VOID-INSTRUCTIONS.md
 
-# Legacy (previous single-file name) — safe to keep
 project.grok
-
 .grok/
-
-# Grok scratch / execution workspace (machine-local, recommended to ignore)
-# Used for temporary run scripts and logs when the AI cannot execute commands directly
+.codex/
 .grok-scratch/
 *.grok-tmp

@@ -28,7 +28,7 @@ PROFILE_DIR="${PROFILE_DIR:-$HOME/.config/mozilla/firefox/drjzrsph.VOID}"
 ROOT="$HOME"
 BUILD_DIR="$ROOT/voidfox-build"
 WRAP_DIR="$ROOT/voidfox"
-AI_TEMP_DIR="${AI_TEMP_DIR:-$HOME/Projects/AI-TEMP}"
+VOIDFOX_DIAG_DIR="${VOIDFOX_DIAG_DIR:-$HOME/voidfox-diagnostics}"
 
 NUKE_TARGETS=(
   "$BUILD_DIR"
@@ -70,7 +70,7 @@ Useful runtime tests after a build:
 Environment overrides:
   PROFILE_DIR=...        Firefox profile to launch.
   ICON_SOURCE=...        Icon to install.
-  AI_TEMP_DIR=...        Log/scratch directory for runtime diagnostics.
+  VOIDFOX_DIAG_DIR=...   Log/scratch directory for runtime diagnostics.
 EOF
 }
 
@@ -113,10 +113,8 @@ run_doctor() {
     issues=$((issues + 1))
   fi
 
-  if [[ ! -d "$AI_TEMP_DIR" ]]; then
-    echo "WARN: AI_TEMP_DIR does not exist: $AI_TEMP_DIR"
-    issues=$((issues + 1))
-  fi
+  echo "Diagnostics dir: ${VOIDFOX_DIAG_DIR} (created on demand)"
+  echo
 
   if [[ ! -d "$PROFILE_DIR" ]]; then
     echo "WARN: Profile not found: $PROFILE_DIR"
@@ -198,9 +196,9 @@ reset_risky_prefs() {
     return 1
   fi
 
-  mkdir -p "$AI_TEMP_DIR"
-  backup="${AI_TEMP_DIR}/voidfox-prefs-$(date +%Y%m%d-%H%M%S).js"
-  tmp="${AI_TEMP_DIR}/voidfox-prefs-clean-$$.js"
+  mkdir -p "$VOIDFOX_DIAG_DIR"
+  backup="${VOIDFOX_DIAG_DIR}/voidfox-prefs-$(date +%Y%m%d-%H%M%S).js"
+  tmp="${VOIDFOX_DIAG_DIR}/voidfox-prefs-clean-$$.js"
 
   cp "$prefs_file" "$backup"
 
@@ -494,12 +492,12 @@ export MOZ_APP_REMOTINGNAME="${DESKTOP_ID}"
 
 FFBIN="${DISTBIN}/firefox"
 PROFILE_DIR="\${PROFILE_DIR:-${PROFILE_DIR}}"
-AI_TEMP_DIR="\${AI_TEMP_DIR:-${AI_TEMP_DIR}}"
+VOIDFOX_DIAG_DIR="\${VOIDFOX_DIAG_DIR:-${VOIDFOX_DIAG_DIR}}"
 
 if [[ "\${VOIDFOX_LOG_GFX:-0}" == "1" ]]; then
-  mkdir -p "\$AI_TEMP_DIR" 2>/dev/null || true
+  mkdir -p "\$VOIDFOX_DIAG_DIR" 2>/dev/null || true
   export MOZ_LOG="\${MOZ_LOG:-PlatformDecoderModule:5,GfxInfo:5,WidgetWayland:5,Widget:3}"
-  export MOZ_LOG_FILE="\${MOZ_LOG_FILE:-\$AI_TEMP_DIR/voidfox-gfx.log}"
+  export MOZ_LOG_FILE="\${MOZ_LOG_FILE:-\$VOIDFOX_DIAG_DIR/voidfox-gfx.log}"
 fi
 
 if [[ "\${VOIDFOX_SAFE_MODE:-0}" == "1" ]]; then

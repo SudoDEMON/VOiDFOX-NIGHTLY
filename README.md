@@ -57,13 +57,13 @@ cd ~/Projects/VoidFOX
 ~/voidfox/run-gfx-log.sh
 ```
 
-`--reset-risky-prefs` backs up `prefs.js` into `~/Projects/AI-TEMP/` and removes only the risky graphics/video force-enable lines listed below. It refuses to run while VOiDFOX is open.
+`--reset-risky-prefs` backs up `prefs.js` into `~/voidfox-diagnostics/` and removes only the risky graphics/video force-enable lines listed below. It refuses to run while VOiDFOX is open.
 
 `run-safe-mode.sh` starts Firefox safe mode with the normal VOiDFOX profile. If the issue disappears there, suspect profile prefs, extensions, theme, or forced graphics settings.
 
 `run-x11.sh` starts the same build/profile with `MOZ_ENABLE_WAYLAND=0`. If the issue disappears there but not in safe mode, suspect the NVIDIA/KDE Wayland path.
 
-`run-gfx-log.sh` writes graphics-related logs to `~/Projects/AI-TEMP/voidfox-gfx.log` by default. Override with `AI_TEMP_DIR=...` or `MOZ_LOG_FILE=...` if needed.
+`run-gfx-log.sh` writes graphics-related logs to `~/voidfox-diagnostics/voidfox-gfx.log` by default. Override with `VOIDFOX_DIAG_DIR=...` or `MOZ_LOG_FILE=...` if needed.
 
 The profile should not force graphics/video acceleration prefs unless there is a specific reason. In particular, reset these before treating the build as broken:
 
@@ -82,7 +82,7 @@ media.navigator.mediadatadecoder_vp8_hardware_enabled
 - Installed icon name: `voidfox`
 - Build dir: `~/voidfox-build`
 - Wrapper/install dir: `~/voidfox`
-- Runtime diagnostics/log scratch dir: `~/Projects/AI-TEMP` (can override with `AI_TEMP_DIR=...`)
+- Runtime diagnostics/log scratch dir: `~/voidfox-diagnostics` (can override with `VOIDFOX_DIAG_DIR=...`)
 - CPU opts: znver5 (Zen 5 / 9950X3D), -O3 etc.
 - Many Firefox features intentionally disabled for a lean build
 
