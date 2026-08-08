@@ -2,9 +2,12 @@
 
 Custom Firefox build from source — "VOiDFOX" (Void Nightly Edition).
 
-This repo holds the build recipe/script used to produce a personalized, optimized Firefox nightly on Linux (KDE Plasma + Wayland).
+This repo holds the build recipes used to produce personalized Firefox nightly builds:
 
-## The Build Script
+- [build.sh](build.sh) for the original Linux/KDE/Wayland host
+- [build-windows.ps1](build-windows.ps1) for a separate Windows build/install path
+
+## Linux Build Script
 
 The heart of the project is [build.sh](build.sh) — an opinionated, self-contained bash script that:
 
@@ -21,14 +24,51 @@ The heart of the project is [build.sh](build.sh) — an opinionated, self-contai
 
 After a successful run you launch via the app menu ("VOiDFOX") or `~/voidfox/run.sh`.
 
+## Windows Build Script
+
+[build-windows.ps1](build-windows.ps1) is the Windows-specific counterpart. It intentionally does not modify `build.sh` and does not try to copy Linux-only KDE/XDG/Wayland behavior onto Windows.
+
+It currently:
+
+- Runs a non-destructive doctor check for MozillaBuild, Visual Studio C++ tools, Python, Git, Curl, disk space, and the repo icon
+- Uses Windows-specific directories: `%USERPROFILE%\voidfox-build-windows` and `%USERPROFILE%\voidfox-windows`
+- Bootstraps/syncs Firefox source from Mozilla main
+- Writes a conservative Windows `mozconfig`
+- Runs `mach clobber` and `mach build`
+- Creates `run.cmd`, `run.ps1`, `run-safe-mode.cmd`, and `run-gfx-log.cmd`
+- Creates a desktop shortcut named `VOiDFOX Windows.lnk`
+
+It does not currently set VOiDFOX as the Windows default browser. Windows default-browser registration is registry/AppUserModelID territory and should be handled separately after the build is proven stable.
+
 ## Prerequisites
+
+### Linux
 
 - `toilet` (for the fancy phase banners — optional but expected by the script)
 - Standard build deps (script checks for: curl, python3, git, clang, ld.lld, jq, xdg-mime, xdg-settings)
 - The Firefox bootstrap will pull the rest (rust, etc.)
 - Plenty of RAM, disk space, and time (full optimized build from source)
 
+### Windows
+
+- Windows 10 or later
+- MozillaBuild installed at `C:\mozilla-build`
+- Visual Studio Build Tools with C++ desktop build components
+- Real python.org Python on `PATH` (not the Microsoft Store app execution alias)
+- Git and Curl on `PATH`
+- Plenty of RAM, disk space, and time; keep at least 80GB free for this workflow
+
+Start with:
+
+```powershell
+cd $env:USERPROFILE\Documents\Projects\VOiDFOX-NIGHTLY-WINDOWS
+.\build-windows.ps1 -Doctor
+.\build-windows.ps1 -Help
+```
+
 ## Usage
+
+Linux:
 
 ```bash
 cd ~/Projects/VoidFOX
@@ -38,11 +78,22 @@ cd ~/Projects/VoidFOX
 ./build.sh
 ```
 
-The script is deliberately loud and theatrical. It will refuse to run if safety checks on paths fail.
+Windows:
 
-**Warning**: It does `rm -rf` of the previous build dirs every time. It also modifies your user XDG defaults and mime handlers.
+```powershell
+cd $env:USERPROFILE\Documents\Projects\VOiDFOX-NIGHTLY-WINDOWS
+.\build-windows.ps1 -Doctor
+.\build-windows.ps1 -BootstrapOnly
+.\build-windows.ps1
+```
+
+The Linux script is deliberately loud and theatrical. Both scripts refuse unsafe path operations before deleting build/install directories.
+
+**Warning**: `build.sh` does `rm -rf` of the previous Linux build dirs every time. It also modifies your user XDG defaults and mime handlers. `build-windows.ps1` removes only the Windows-specific build/install dirs under `%USERPROFILE%` unless `-NoClobber` is used.
 
 `./build.sh --doctor` is non-destructive. Use it first when diagnosing the current local build/profile.
+
+`.\build-windows.ps1 -Doctor` is non-destructive. Use it first before installing prerequisites or starting a multi-hour Windows build.
 
 ## Runtime Diagnostics
 
@@ -76,6 +127,8 @@ media.navigator.mediadatadecoder_vp8_hardware_enabled
 
 ## Configuration Notes (Hard-coded in script)
 
+### Linux
+
 - `APP_NAME=VOiDFOX`, desktop id `voidfox`
 - Profile: `~/.config/mozilla/firefox/drjzrsph.VOID` (can override with `PROFILE_DIR=... ./build.sh`)
 - Icon source: `icon.svg` (shipped in this repo, next to build.sh; override with `ICON_SOURCE=...`)
@@ -85,6 +138,16 @@ media.navigator.mediadatadecoder_vp8_hardware_enabled
 - Runtime diagnostics/log scratch dir: `~/voidfox-diagnostics` (can override with `VOIDFOX_DIAG_DIR=...`)
 - CPU opts: znver5 (Zen 5 / 9950X3D), -O3 etc.
 - Many Firefox features intentionally disabled for a lean build
+
+### Windows
+
+- App shortcut: `VOiDFOX Windows.lnk`
+- Profile: `%APPDATA%\Mozilla\Firefox\Profiles\VOID-WINDOWS` (can override with `VOIDFOX_PROFILE_DIR=...`)
+- Build dir: `%USERPROFILE%\voidfox-build-windows`
+- Wrapper/install dir: `%USERPROFILE%\voidfox-windows`
+- Runtime diagnostics/log scratch dir: `%USERPROFILE%\Documents\Projects\AI-TEMP`
+- Windows mozconfig keeps optimization conservative and uses `RUSTFLAGS=-C target-cpu=native`
+- Linux-only `znver5`, GTK, Wayland, XDG, and KDE integration stay in `build.sh`
 
 ## Icon & Assets
 
@@ -101,6 +164,8 @@ The GitHub remote (origin) is https://github.com/SudoDEMON/VOiDFOX-NIGHTLY (SSH:
 ## Future Work
 
 - Add `DRY_RUN=1` (or `--dry-run`) support so generated files and path decisions can be validated without a full multi-hour build
+- Add a Windows dry-run mode after the first successful Windows bootstrap/build cycle
+- Decide whether Windows default-browser registration is worth implementing, and if so handle it as an explicit separate command
 - Harden TOP_OBJDIR extraction and add more upfront soft checks (disk space, additional tools like gtk-update-icon-cache)
 - Write build provenance info (recipe git hash, date, key flags) into the wrapper dir after each successful run
 - Improve profile ergonomics (better docs + perhaps a helper to discover the on-disk dir name)
