@@ -175,3 +175,10 @@ The GitHub remote (origin) is https://github.com/SudoDEMON/VOiDFOX-NIGHTLY (SSH:
 - Keep it in sync with upstream Firefox changes that affect custom builds (bootstrap.py, mach environment format, etc.)
 
 Run `./build.sh` at your own risk / for your own hardware.
+
+## Local CI migration
+
+The `.forgejo/workflows/` checks run on the isolated Linux worker with one job
+at a time. GitHub workflows stay available until the matching Forgejo checks
+pass; GitHub remains the issue, pull-request and release archive. Build jobs
+do not receive production deployment credentials.
