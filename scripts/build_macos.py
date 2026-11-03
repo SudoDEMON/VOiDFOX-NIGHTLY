@@ -179,17 +179,21 @@ def prepare_branding(source, root):
 def install_app(root, source, python, env, package):
     # Mount the packaged app: obj/dist/*.app contains development symlinks.
     with tempfile.TemporaryDirectory(prefix='package-', dir=root) as scratch:
-        mount = Path(scratch) / 'mount'
-        mount.mkdir()
-        run('hdiutil', 'attach', '-readonly', '-nobrowse', '-mountpoint', mount, package)
+        attached = plistlib.loads(run('hdiutil', 'attach', '-readonly', '-nobrowse',
+                                      '-plist', package, capture=True).encode())
+        mounts = [Path(entity['mount-point']) for entity in attached['system-entities']
+                  if 'mount-point' in entity]
         try:
-            apps = list(mount.glob('*.app'))
+            if len(mounts) != 1:
+                raise ValueError('Expected one mounted filesystem in the packaged image.')
+            apps = list(mounts[0].glob('*.app'))
             if len(apps) != 1:
                 raise ValueError('Expected one application in the packaged image.')
             app = Path(scratch) / 'VOiDFOX.app'
             run('ditto', apps[0], app)
         finally:
-            run('hdiutil', 'detach', mount)
+            for mount in mounts:
+                run('hdiutil', 'detach', mount)
         info = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
         if info.get('CFBundleIdentifier') != 'net.syntos.voidfox':
             raise ValueError('Packaged app does not have the expected VOiDFOX bundle identity.')
@@ -206,7 +210,7 @@ def install_app(root, source, python, env, package):
         (distribution / 'policies.json').write_text(json.dumps({'policies': {
             'Extensions': {'Install': ['https://addons.mozilla.org/firefox/downloads/latest/icy-void-oled/latest.xpi']}
         }}, indent=2) + '\n')
-        run(python, source / 'mach', 'macos-sign', '-a', app, cwd=source, env=env)
+        run(python, source / 'mach', 'macos-sign', '-c', 'nightly', '-a', app, cwd=source, env=env)
         run('codesign', '--verify', '--deep', '--strict', app)
         architectures = run('lipo', '-archs', app / 'Contents/MacOS/firefox', capture=True)
         if 'arm64' not in architectures.split():

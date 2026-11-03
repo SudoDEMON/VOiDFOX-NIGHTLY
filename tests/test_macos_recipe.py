@@ -99,12 +99,16 @@ class RecipeTests(unittest.TestCase):
 
             def fake_run(*args, **kwargs):
                 if args[:2] == ('hdiutil', 'attach'):
-                    app = Path(args[-2]) / 'VOiDFOX.app'
+                    mount = root / 'mounted-image'
+                    app = mount / 'VOiDFOX.app'
                     (app / 'Contents/Resources').mkdir(parents=True)
                     (app / 'Contents/Info.plist').write_bytes(plistlib.dumps(identity))
                     (app / 'Contents/Resources/application.ini').write_text('[App]\nProfile=VOiDFOX\n')
+                    return plistlib.dumps({'system-entities': [{'mount-point': str(mount)}]}).decode()
                 elif args[0] == 'ditto':
                     shutil.copytree(args[1], args[2])
+                elif 'macos-sign' in args:
+                    self.assertEqual(args[args.index('-c') + 1], 'nightly')
                 elif args[0] == 'codesign' and fail_signature:
                     raise subprocess.CalledProcessError(1, args)
                 elif args[0] == 'lipo':

@@ -118,9 +118,17 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
 ./build-macos.sh --doctor
 ```
 
-The safety tests use temporary fixtures and do not compile Firefox. The first
-full compilation, packaged-app launch, and browser functionality still need to be
-validated on a Mac with full Xcode installed.
+The safety tests use temporary fixtures and do not compile Firefox. On 2026-11-03,
+the full Firefox 161.0a1 build was validated on an Apple M4 with macOS 27.2 and
+Xcode 27.2: packaging, ad-hoc signing, ARM64 verification, graphical launch,
+HTTPS browsing, and a headless JavaScript/DOM/CSS/Canvas rendering check passed.
+The headless run emitted sandbox-extension and shutdown diagnostics while still
+rendering correctly and exiting successfully; this is not comprehensive browser
+compatibility testing.
+
+The DMG mounts at the location chosen by macOS; custom mount points on external
+volumes can be denied. Signing explicitly selects the Nightly channel because
+Mozilla cannot infer it from the custom VOiDFOX bundle ID.
 
 ## Prerequisites
 
