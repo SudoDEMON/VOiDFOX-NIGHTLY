@@ -54,10 +54,13 @@ configuration, without Zen 5 flags.
 ### Prerequisites and external storage
 
 Follow [Mozilla's macOS prerequisites](https://firefox-source-docs.mozilla.org/setup/macos_build.html):
-full Xcode with its license accepted and developer directory selected, Homebrew,
+full Xcode with its license accepted and first-run setup complete, Homebrew,
 and a compatible Python. The recipe selects Python 3.13, then 3.14, 3.12, 3.11,
 or 3.10. `VOIDFOX_PYTHON=/absolute/path/to/python3.13` overrides selection without
-changing the system Python. Mozilla bootstrap supplies the build toolchain.
+changing the system Python. When `DEVELOPER_DIR` is unset and Xcode is installed
+at `/Applications/Xcode.app`, the launcher selects it for this process without
+changing the system-wide `xcode-select` setting. Mozilla bootstrap supplies the
+build toolchain; unrelated agentic coding tools are excluded.
 
 The default build root is `/Volumes/INTEL-2TB/voidfox-macos`. Source, objects,
 Mozilla toolchains, Cargo cache, and Rustup state go beneath it. The volume must

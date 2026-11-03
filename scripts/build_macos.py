@@ -130,8 +130,8 @@ def prepare_source(root, python, env):
     run('git', 'fetch', 'origin', 'main', cwd=source)
     # No reset, clean, clobber, or deletion of the source tree.
     run('git', 'merge', '--ff-only', 'FETCH_HEAD', cwd=source)
-    run(python, source / 'mach', 'bootstrap', '--application-choice=browser',
-        '--no-interactive', cwd=source, env=env)
+    run(python, source / 'mach', '--no-interactive', 'bootstrap',
+        '--application-choice=browser', '--no-agentic-tools', cwd=source, env=env)
     return source
 
 
