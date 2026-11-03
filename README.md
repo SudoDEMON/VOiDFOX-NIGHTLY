@@ -6,6 +6,7 @@ This repo holds the build recipes used to produce personalized Firefox nightly b
 
 - [build.sh](build.sh) for the original Linux/KDE/Wayland host
 - [build-windows.ps1](build-windows.ps1) for a separate Windows build/install path
+- [build-macos.sh](build-macos.sh) for native Apple Silicon macOS builds
 
 ## Linux Build Script
 
@@ -39,6 +40,84 @@ It currently:
 - Creates a desktop shortcut named `VOiDFOX Windows.lnk`
 
 It does not currently set VOiDFOX as the Windows default browser. Windows default-browser registration is registry/AppUserModelID territory and should be handled separately after the build is proven stable.
+
+## macOS Build Recipe
+
+`build-macos.sh` runs the Python orchestration in `scripts/build_macos.py`.
+It builds Firefox main natively for Apple Silicon, packages a standalone
+`~/Applications/VOiDFOX.app`, applies the repository icon and theme-install policy,
+and ad-hoc signs the installed bundle. Default build settings use four compiler
+jobs and normal optimization. `--pgo` opts into PGO and ThinLTO; it costs more
+memory, storage, and build time. Compiler CPU settings use Mozilla's native ARM64
+configuration, without Zen 5 flags.
+
+### Prerequisites and external storage
+
+Follow [Mozilla's macOS prerequisites](https://firefox-source-docs.mozilla.org/setup/macos_build.html):
+full Xcode with its license accepted and developer directory selected, Homebrew,
+and a compatible Python. The recipe selects Python 3.13, then 3.14, 3.12, 3.11,
+or 3.10. `VOIDFOX_PYTHON=/absolute/path/to/python3.13` overrides selection without
+changing the system Python. Mozilla bootstrap supplies the build toolchain.
+
+The default build root is `/Volumes/INTEL-2TB/voidfox-macos`. Source, objects,
+Mozilla toolchains, Cargo cache, and Rustup state go beneath it. The volume must
+already be mounted; the recipe refuses to create a replacement directory on the
+internal drive. Use a native macOS filesystem such as APFS. Physical build paths
+must contain no whitespace, including after resolving symlinks. Renaming a volume
+can change paths used by other applications; this recipe never renames or formats
+volumes. Keep 80 GiB free as a conservative recipe margin, especially with PGO.
+Xcode, Homebrew, and some system caches still use the system disk.
+
+```bash
+./build-macos.sh --doctor
+./build-macos.sh --dry-run
+./build-macos.sh --bootstrap-only
+./build-macos.sh
+open ~/Applications/VOiDFOX.app
+```
+
+For another mounted drive, pass `--build-root /Volumes/MySSD/voidfox-macos` or
+set `VOIDFOX_BUILD_ROOT`. `--jobs 4` controls parallelism. Doctor and dry-run
+perform no downloads or filesystem writes. Bootstrap-only installs Mozilla build
+dependencies, downloads source, generates branding and mozconfig, then stops.
+A normal run performs all those steps plus compilation, packaging, and installation.
+
+### Profiles, updates, and recovery
+
+The bundle ID is `net.syntos.voidfox`. A small managed `browser/moz.configure`
+patch sets `MOZ_APP_PROFILE=VOiDFOX`; the profile registry lives beneath
+`~/Library/Application Support/VOiDFOX`. This also avoids macOS 27 restrictions
+on custom builds accessing the official Firefox data directory. The patch is
+removed before source updates only when it exactly matches the recipe's expected
+change. Other source edits stop the run for manual reconciliation. Custom branding
+is generated under `browser/branding/voidfox`; do not put hand edits there.
+
+Repeat the build command to update. Source updates use fast-forward merges and
+retain compiled objects. The recipe never resets or clobbers the source tree.
+Automatic browser updates are disabled; this is a manually maintained build.
+Close VOiDFOX before replacing an installed version. A previous installation with
+the expected bundle ID is retained beside the new app with a timestamped name;
+unrelated apps are not replaced. Packaging and signature checks must succeed
+before replacing the installed app. The packaged DMG remains on the build drive;
+the installed app receives the theme policy and local signature after extraction.
+
+Local ad-hoc signing is for use on this Mac. It does not supply notarization or
+restricted entitlements such as macOS passkey support. See
+[Mozilla's signing guide](https://firefox-source-docs.mozilla.org/contributing/signing/signing_macos_build.html).
+The theme policy installs the addon; select it in Add-ons if it is not active.
+
+### Validation
+
+```bash
+bash -n build-macos.sh
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -v
+./build-macos.sh --dry-run
+./build-macos.sh --doctor
+```
+
+The safety tests use temporary fixtures and do not compile Firefox. The first
+full compilation, packaged-app launch, and browser functionality still need to be
+validated on a Mac with full Xcode installed.
 
 ## Prerequisites
 
